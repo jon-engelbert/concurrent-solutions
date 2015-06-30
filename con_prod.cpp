@@ -1,3 +1,4 @@
+// clang++ -std=c++14 multi_rendezvous.cpp -o multi_rendezvous.exe
 #include <thread>
 #include <iostream>
 #include <vector>

@@ -3,6 +3,8 @@
  * Compiled on OSX 10.9, using:
  * g++ -std=c++11 semaphore.cpp
  **/
+
+// clang++ -std=c++14 multi_rendezvous.cpp -o multi_rendezvous.exe
  
 #include <iostream>      
 #include <thread>        

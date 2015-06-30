@@ -2,6 +2,8 @@
 #include <iostream>
 #include <vector>
 
+// clang++ -std=c++14 multi_rendezvous.cpp -o multi_rendezvous.exe
+
 std::mutex mutex;
 
 void hello(){
