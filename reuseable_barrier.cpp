@@ -1,5 +1,6 @@
 // http://en.cppreference.com/w/cpp/thread/condition_variable
 // clang++ -std=c++14 multi_rendezvous.cpp -o multi_rendezvous.exe
+// works!
 #include <thread>
 #include <iostream>
 #include <mutex>
@@ -17,18 +18,21 @@ int allowed_max = 3;
 void worker_thread(int i)
 {
 
-    std::unique_lock<std::mutex> lk2(barrier2);
     {
+        std::unique_lock<std::mutex> lk2(barrier2);
         // hold while NOT arriving or less than allowed number have arrived.
         // proceed (end the barrier) when arriving (or ready to arrive)
-        cv2.wait(lk2, [] {bool end_wait = (is_arriving || is_ready_to_arrive) && (arrived_count < allowed_max); if (end_wait) {arrived_count++; processed_count--; is_arriving = true; is_processing = false; is_ready_to_arrive = false; is_ready_to_process = false;}; return end_wait;});
+        cv2.wait(lk2, [] {bool end_wait = (is_arriving || is_ready_to_arrive) && (arrived_count < allowed_max); return end_wait;});
+        arrived_count++; processed_count--; 
+        is_arriving = true; is_processing = false; 
+        is_ready_to_arrive = false; is_ready_to_process = false;
     }
     {
         std::lock_guard<std::mutex> lk_guard(m);
         std::cout << "counts changing1, is_arriving: " << is_arriving << ".  processed: " << processed_count << ", arrived :"  << arrived_count << " number: " << i  << std::endl;
     }
     // cv2.notify_all();
-    lk2.unlock();
+    // lk2.unlock();
 
     {
         std::lock_guard<std::mutex> lk_guard(m);
@@ -52,7 +56,8 @@ void worker_thread(int i)
     std::unique_lock<std::mutex> lk1(barrier1);
     {
         // std::lock_guard<std::mutex> lk_guard(m_wait);
-        cv1.wait(lk1, []{bool end_wait = (processed_count < allowed_max) && (is_processing || is_ready_to_process); if (end_wait) {processed_count++; arrived_count--; is_arriving = false; is_processing = true; is_ready_to_arrive = false; is_ready_to_process = false;}; return end_wait;});
+        cv1.wait(lk1, []{return (processed_count < allowed_max) && (is_processing || is_ready_to_process);});
+        processed_count++; arrived_count--; is_arriving = false; is_processing = true; is_ready_to_arrive = false; is_ready_to_process = false;
         // processed_count++;
         // arrived_count--;
     }
