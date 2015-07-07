@@ -17,16 +17,24 @@ Spectator::Spectator(size_t index, std::shared_ptr<const Judge> judge) : m_index
 // 	m_judge = judge;
 // }
 
-void Spectator::Enter() {
+bool Spectator::Enter() {
+    bool is_entered = false;
     if (m_judge)
-        m_judge->WaitForNotEntered();
+        is_entered = m_judge->WaitForNotEntered();
+    // Enter();
+    if (is_entered) {
     // std::unique_lock<std::mutex> lk(m);
     // // hold while judge is present.
     // // proceed (end the barrier) before the judge arrives, ** and when the previous set of immigrants has left? **
     // Judge::cv_judgePresent.wait(lk, [this] {return !m_judge || !m_judge->IsPresent();});
     // Enter();
-    std::lock_guard<std::mutex> lk(m);
-    std::cout << "Spectator Enter: "  << m_index  <<  std::endl;
+        std::lock_guard<std::mutex> lk(m);
+        std::cout << "Spectator Enter: "  << m_index  <<  std::endl;
+    } else {
+        std::lock_guard<std::mutex> lk(m);
+        std::cerr << "WaitForNotEntered timed out, spectator #: " << m_index << '\n';  
+    }
+    return is_entered;
 };
 
 void Spectator::SitDown() {
@@ -53,8 +61,9 @@ void Spectator::Wait_Random() {
 }
 
 void Spectator::RunThread() {
-	Enter();
-    Spectate();
-    Wait_Random();
-    Leave();	
+	if (Enter()) {
+        Spectate();
+        Wait_Random();
+        Leave();
+    }	
 }

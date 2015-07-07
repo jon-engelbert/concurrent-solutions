@@ -15,26 +15,29 @@ std::mutex m;
 // judges, spectators and immigrants when a judge arrives or leaves.
 
 
-void Wait_Random() {
+void WaitRandom(int max) {
     std::mt19937_64 eng{std::random_device{}()};  //  seed 
-    std::uniform_int_distribution<> dist{1, 100};
+    std::uniform_int_distribution<> dist{1, 1 + max};
     std::this_thread::sleep_for(std::chrono::milliseconds{dist(eng)});
 };
 
 void runImmigrant(size_t id, std::shared_ptr<const Judge> judge)
 {
     Immigrant immigrant(id, judge);
+    WaitRandom(6);
     immigrant.RunThread();
 }
 
 void runSpectator(size_t id, std::shared_ptr<const Judge> judge)
 {
     Spectator spectator(id, judge);
+    WaitRandom(8);
     spectator.RunThread();
 }
 
 void runJudge(size_t id, std::shared_ptr< Judge> judge)
 {
+    WaitRandom(10);
     judge->RunThread();
 }
 
@@ -46,11 +49,9 @@ int main()
     static const int NUM_SPECTATORS = 10;
     static const int NUM_IMMIGRANTS = 10;
 
-    Immigrant::SetMaxCount(NUM_IMMIGRANTS);
-
     std::thread spectator_thread[NUM_SPECTATORS], immigrant_thread[NUM_IMMIGRANTS];
     std::thread judge_thread;
-    auto judge = std::make_shared<Judge>();
+    auto judge = std::make_shared<Judge>(0);
 
     // Kick everything off
     std::vector<std::thread> immigrants;
@@ -59,13 +60,13 @@ int main()
         immigrants.emplace_back(runImmigrant, ii, judge);
     }
 
+    std::thread judgeThread(runJudge, 0, judge);
     std::vector<std::thread> spectators;
     for (size_t ii = 0; ii < NUM_SPECTATORS; ++ii)
     {
         spectators.emplace_back(runSpectator, ii, judge);
     }
 
-    std::thread judgeThread(runJudge, 0, judge);
 
     // judge_thread = std::thread(judge.RunThread());
     // for (int i = 0; i < NUM_SPECTATORS; i++) {

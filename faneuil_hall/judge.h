@@ -9,13 +9,15 @@
 class Judge {
 private: 
 	bool m_isDoneConfirming;
+    bool m_hasEntered;
 	static bool m_isPresent;
-    static std::mutex m_presentMutex;
     static std::mutex m_preconfirmMutex;
     size_t m_index;
+    static std::condition_variable cv_immigrantsAllPresent;
+    static std::condition_variable cv_confirmed;
 public:
-	static std::condition_variable cv_confirmed;
-	static std::condition_variable cv_judgePresent;
+    static std::mutex m_presentMutex;
+    static std::condition_variable cv_judgePresent;
 	Judge() {};
 	Judge(size_t index);
     void Enter();
@@ -31,7 +33,7 @@ public:
     bool IsDoneConfirming() {return m_isDoneConfirming;}
     void SignalImmigrantsPresent() const;
     void RunThread();
-    void WaitForNotEntered() const;
+    bool WaitForNotEntered() const;
 	void WaitForConfirmed() const;
 };
 

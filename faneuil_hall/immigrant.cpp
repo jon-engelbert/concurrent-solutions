@@ -13,7 +13,6 @@
 extern std::mutex m;
 
 std::atomic_int Immigrant::m_count, Immigrant::m_checkedInCount;
-std::condition_variable Immigrant::cv_immigrantsAllPresent;
 int Immigrant::m_maxCount = 0;
 
 Immigrant::Immigrant(size_t index) : m_index(index) {
@@ -26,17 +25,24 @@ Immigrant::Immigrant(size_t index, std::shared_ptr<const Judge> judge) : m_index
 //     m_judge =judge;
 // }
 
-void Immigrant::Enter() {
+bool Immigrant::Enter() {
     // std::unique_lock<std::mutex> lk(m);
     // hold while judge is present.
     // proceed (end the barrier) before the judge arrives, ** and when the previous set of immigrants has left? **
     // Judge::cv_judgePresent.wait(lk, [this] {return !m_judge || !m_judge->IsPresent();});
+    bool is_entered = false;
     if (m_judge)
-        m_judge->WaitForNotEntered();
+        is_entered = m_judge->WaitForNotEntered();
     // Enter();
-    std::lock_guard<std::mutex> lk(m);
-    m_count++;
-    std::cout << "Immigrant Enter: " << m_index <<  std::endl;
+    if (is_entered) {
+        std::lock_guard<std::mutex> lk(m);
+        m_count++;
+        std::cout << "Immigrant Enter: " << m_index <<  std::endl;
+    } else {
+        std::lock_guard<std::mutex> lk(m);
+        std::cerr << "WaitForNotEntered timed out, immigrant #: " << m_index << '\n';  
+    }
+    return is_entered;
 };
 
 void Immigrant::SitDown() {
@@ -69,16 +75,20 @@ void Immigrant::Checkin() {
 };
 
 void Immigrant::Leave() {
-    // std::unique_lock<std::mutex> lk(m_present);
-    // // hold while  judge is present.
-    // // proceed (end the barrier) after the judge leaves
-    // Judge::cv_judgePresent.wait(lk, [this] {return !m_judge->IsPresent();});
-    if (m_judge)
-        m_judge->WaitForNotEntered();
-    std::lock_guard<std::mutex> lk(m);
-    m_count--;
-    m_checkedInCount--;
-    std::cout << "Immigrant Leave: "  << m_index << std::endl;
+    {
+        std::unique_lock<std::mutex> lk(Judge::m_presentMutex);
+        // // hold while  judge is present.
+        // // proceed (end the barrier) after the judge leaves
+        Judge::cv_judgePresent.wait(lk, [this] {return !m_judge || !m_judge->IsPresent();});
+        m_count--;
+        m_checkedInCount--;
+     }
+        // if (m_judge)
+        //     m_judge->WaitForNotEntered();
+     {
+        std::lock_guard<std::mutex> lk(m);
+        std::cout << "Immigrant Leave: "  << m_index << std::endl;
+    }
 }
 
 
@@ -89,10 +99,12 @@ void Immigrant::WaitRandom() {
 }
 
 void Immigrant::RunThread() {
-    Enter();
-    Checkin();
-    // cv_immigrant_present.notify_one();
-    SitDown();
-    GetCertificate();
-    Leave();
+    bool is_entered = Enter();
+    if (is_entered) {
+        Checkin();
+        // cv_immigrant_present.notify_one();
+        SitDown();
+        GetCertificate();
+        Leave();
+    }
 }

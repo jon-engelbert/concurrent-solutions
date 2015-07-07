@@ -13,7 +13,7 @@ public:
 	Spectator(size_t index, std::shared_ptr<const Judge> judge);
 	// Spectator(std::shared_ptr<const Judge> judge);
     // void SetJudge(std::shared_ptr<const Judge> judge);
-    void Enter();
+    bool Enter();
 
     void SitDown();
 

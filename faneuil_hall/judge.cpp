@@ -11,17 +11,20 @@
 
 std::condition_variable Judge::cv_confirmed;
 std::condition_variable Judge::cv_judgePresent;
+std::condition_variable Judge::cv_immigrantsAllPresent;
 std::mutex Judge::m_presentMutex;
 std::mutex Judge::m_preconfirmMutex;
 bool Judge::m_isPresent = false;
 extern std::mutex m;
 
-Judge::Judge(size_t index) : m_index(index) {
+Judge::Judge(size_t index) : m_index(index), m_isDoneConfirming(false), m_hasEntered(false) {
+    std::lock_guard<std::mutex> lk(m);
+    std::cout << "Judge initialized: "  <<  std::endl;
 }
 
 
 void Judge::SignalImmigrantsPresent() const {
-	Immigrant::cv_immigrantsAllPresent.notify_one();
+	cv_immigrantsAllPresent.notify_one();
 }
 
 void Judge::Enter() {
@@ -32,13 +35,14 @@ void Judge::Enter() {
         // But What if two judges waiting?  can both enter at the same time?  
         // or will m_present/cv_present be locked as soon as one enters, until the end of the block, then it gets unlocked again
         cv_judgePresent.wait(lk, [this] {return !m_isPresent;});
+    // }
+    // {
+    //     std::lock_guard<std::mutex> lk(m);
+        std::cout << "Judge Enter: "  <<  std::endl; 
         // std::lock_guard<std::mutex> lk(m);
         m_isPresent = true;
+        m_hasEntered = true;
         cv_judgePresent.notify_all();	// notify all judges, immigrants and spectators.
-    }
-    {
-        std::lock_guard<std::mutex> lk(m);
-        std::cout << "Judge Enter: "  <<  std::endl; 
     }
 };
 
@@ -50,24 +54,30 @@ void Judge::SitDown() {
 
 
 void Judge::Confirm() {
-    std::unique_lock<std::mutex> lk(m_preconfirmMutex);
-    // hold while judge is present.
-    // proceed (end the barrier) before the judge arrives, or when the judge leaves
-    // But What if two judges waiting?  can both enter at the same time?  
-    // or will m_present/cv_present be locked as soon as one enters, until the end of the block, then it gets unlocked again
-    Immigrant::cv_immigrantsAllPresent.wait(lk, [] {return Immigrant::IsAllCheckedIn();});
-    std::cout << "Judge Confirm." <<  std::endl;
-    m_isDoneConfirming = true;
+    {
+        std::unique_lock<std::mutex> lk(m_preconfirmMutex);
+        // hold while judge is present.
+        // proceed (end the barrier) before the judge arrives, or when the judge leaves
+        // But What if two judges waiting?  can both enter at the same time?  
+        // or will m_present/cv_present be locked as soon as one enters, until the end of the block, then it gets unlocked again
+        cv_immigrantsAllPresent.wait(lk, [] {return Immigrant::IsAllCheckedIn();});
+        m_isDoneConfirming = true;
+    }
+    {
+        std::lock_guard<std::mutex> lk(m);
+        std::cout << "Judge Confirm." <<  std::endl;
+    }
     cv_confirmed.notify_all();
-    // std::lock_guard<std::mutex> lk(m);
 };
 
 
 void Judge::Leave() {
     m_isPresent = false;
+    // m_isDoneConfirming = false;
     std::mutex presentMutex;
     std::lock_guard<std::mutex> lk(m);
     std::cout << "Judge leave." <<  std::endl;
+    cv_judgePresent.notify_all();   // notify all judges, immigrants and spectators.
 }
 
 
@@ -86,11 +96,15 @@ void Judge::RunThread()
     cv_judgePresent.notify_all();
 }
 
-void Judge::WaitForNotEntered() const {
+bool Judge::WaitForNotEntered() const {
+    bool is_entered = false;
     std::unique_lock<std::mutex> lk(m_presentMutex);
     // hold while judge is present.
     // proceed (end the barrier) before the judge arrives, ** and when the previous set of immigrants has left? **
-    cv_judgePresent.wait(lk, [this] {return !IsPresent();});
+    auto now = std::chrono::system_clock::now();
+    if (cv_judgePresent.wait_until(lk, now + std::chrono::milliseconds(100), [this] {return !IsPresent() && !m_hasEntered;})) 
+        is_entered = true;  
+    return is_entered;
 }
 
 void Judge::WaitForConfirmed() const
