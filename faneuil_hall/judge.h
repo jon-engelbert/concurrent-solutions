@@ -9,12 +9,14 @@
 class Judge {
 private: 
 	bool m_isDoneConfirming;
-	bool m_isPresent;
-	std::mutex m;
+	static bool m_isPresent;
+    static std::mutex m_presentMutex;
+    static std::mutex m_preconfirmMutex;
     size_t m_index;
 public:
 	static std::condition_variable cv_confirmed;
 	static std::condition_variable cv_judgePresent;
+	Judge() {};
 	Judge(size_t index);
     void Enter();
 
@@ -33,4 +35,4 @@ public:
 	void WaitForConfirmed() const;
 };
 
-#endif // SPECTATOR_H
+#endif // JUDGE_H

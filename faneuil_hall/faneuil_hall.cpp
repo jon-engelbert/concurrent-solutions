@@ -21,43 +21,79 @@ void Wait_Random() {
     std::this_thread::sleep_for(std::chrono::milliseconds{dist(eng)});
 };
 
+void runImmigrant(size_t id, std::shared_ptr<const Judge> judge)
+{
+    Immigrant immigrant(id, judge);
+    immigrant.RunThread();
+}
 
+void runSpectator(size_t id, std::shared_ptr<const Judge> judge)
+{
+    Spectator spectator(id, judge);
+    spectator.RunThread();
+}
+
+void runJudge(size_t id, std::shared_ptr< Judge> judge)
+{
+    judge->RunThread();
+}
 
 
 
 int main()
 {
 	int i;
-    // Spectator spectator_(0);
-    // Immigrant immigrant_(0);
-    std::vector<Spectator*> spectators;
-    std::vector<Immigrant*> immigrants;
     static const int NUM_SPECTATORS = 10;
     static const int NUM_IMMIGRANTS = 10;
+
+    Immigrant::SetMaxCount(NUM_IMMIGRANTS);
+
     std::thread spectator_thread[NUM_SPECTATORS], immigrant_thread[NUM_IMMIGRANTS];
     std::thread judge_thread;
     auto judge = std::make_shared<Judge>();
-    judge_thread = std::thread(judge.RunThread());
-    for (int i = 0; i < NUM_SPECTATORS; i++) {
-        auto spectator = new Spectator(i);
-        spectator->SetJudge(judge);
-        spectators.push_back(spectator);
-        spectator_thread[i] = std::thread(spectator->RunThread());
-    }
-    for (int i = 0; i < NUM_IMMIGRANTS; i++) {
-        auto immigrant = new Immigrant(i);
-        immigrant->SetJudge(judge);
-        immigrant_thread[i] = std::thread(immigrant->RunThread());
-        immigrants.push_back(immigrant);
-    }
+
+    // Kick everything off
+    std::vector<std::thread> immigrants;
+    for (size_t ii = 0; ii < NUM_IMMIGRANTS; ++ii)
     {
-        std::lock_guard<std::mutex> lk(m);
-        std::cout << "Back in main(), after initializing  thread batch "  << std::endl;
+        immigrants.emplace_back(runImmigrant, ii, judge);
     }
-    for (int i = 0; i < 6; i++) {
-        spectator_thread[i].join();
-        immigrant_thread[i].join();
+
+    std::vector<std::thread> spectators;
+    for (size_t ii = 0; ii < NUM_SPECTATORS; ++ii)
+    {
+        spectators.emplace_back(runSpectator, ii, judge);
+    }
+
+    std::thread judgeThread(runJudge, 0, judge);
+
+    // judge_thread = std::thread(judge.RunThread());
+    // for (int i = 0; i < NUM_SPECTATORS; i++) {
+    //     auto spectator = new Spectator(i);
+    //     spectator->SetJudge(judge);
+    //     spectators.push_back(spectator);
+    //     spectator_thread[i] = std::thread(spectator->RunThread());
+    // }
+    // for (int i = 0; i < NUM_IMMIGRANTS; i++) {
+    //     auto immigrant = new Immigrant(i);
+    //     immigrant->SetJudge(judge);
+    //     immigrant_thread[i] = std::thread(immigrant->RunThread());
+    //     immigrants.push_back(immigrant);
+    // }
+    // {
+    //     std::lock_guard<std::mutex> lk(m);
+    //     std::cout << "Back in main(), after initializing  thread batch "  << std::endl;
+    // }
+
+    // Wait for everything
+    for (auto& ii : immigrants)
+    {
+        ii.join();
+    }
+    for (auto& ss : spectators)
+    {
+        ss.join();
     }
     // for (int i = 0; i < 2; i++)
-    judge_thread.join();
+    judgeThread.join();
 }

@@ -4,14 +4,18 @@
 #include <random>
 #include <chrono>
 
+extern std::mutex m;
+
 Spectator::Spectator(size_t index) : m_index(index) {
 }
-
-
-void Spectator::SetJudge(std::shared_ptr<const Judge> judge) {
-    // const std::shared_ptr<const Judge> m_judge;
-	m_judge = judge;
+ 
+Spectator::Spectator(size_t index, std::shared_ptr<const Judge> judge) : m_index(index), m_judge(judge) {
 }
+
+// void Spectator::SetJudge(std::shared_ptr<const Judge> judge) {
+//     // const std::shared_ptr<const Judge> m_judge;
+// 	m_judge = judge;
+// }
 
 void Spectator::Enter() {
     if (m_judge)

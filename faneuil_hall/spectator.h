@@ -6,13 +6,13 @@ class Spectator {
 private: 
     std::shared_ptr<const Judge> m_judge;
     // Judge m_judge;
-	std::mutex m;
-    static std::condition_variable cv_judge_present;
+    // static std::condition_variable cv_judge_present;
     size_t m_index;
 public:
 	Spectator(size_t index);
+	Spectator(size_t index, std::shared_ptr<const Judge> judge);
 	// Spectator(std::shared_ptr<const Judge> judge);
-    void SetJudge(std::shared_ptr<const Judge> judge);
+    // void SetJudge(std::shared_ptr<const Judge> judge);
     void Enter();
 
     void SitDown();

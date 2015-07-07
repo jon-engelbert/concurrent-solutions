@@ -10,12 +10,21 @@
 #include "immigrant.h"
 #include "judge.h"
 
+extern std::mutex m;
+
+std::atomic_int Immigrant::m_count, Immigrant::m_checkedInCount;
+std::condition_variable Immigrant::cv_immigrantsAllPresent;
+int Immigrant::m_maxCount = 0;
+
 Immigrant::Immigrant(size_t index) : m_index(index) {
 }
 
-void Immigrant::SetJudge(std::shared_ptr<const Judge>& judge) {
-    m_judge =judge;
+Immigrant::Immigrant(size_t index, std::shared_ptr<const Judge> judge) : m_index(index), m_judge(judge) {
 }
+
+// void Immigrant::SetJudge(std::shared_ptr<const Judge>& judge) {
+//     m_judge =judge;
+// }
 
 void Immigrant::Enter() {
     // std::unique_lock<std::mutex> lk(m);
@@ -25,35 +34,37 @@ void Immigrant::Enter() {
     if (m_judge)
         m_judge->WaitForNotEntered();
     // Enter();
-    std::mutex m;
     std::lock_guard<std::mutex> lk(m);
     m_count++;
-    std::cout << "Immigrant Enter: "  <<  std::endl;
+    std::cout << "Immigrant Enter: " << m_index <<  std::endl;
 };
 
 void Immigrant::SitDown() {
-    std::mutex m;
     std::lock_guard<std::mutex> lk(m);
-    std::cout << "Immigrant Sit Down: "  <<  std::endl;
+    std::cout << "Immigrant Sit Down: "  << m_index <<  std::endl;
 };
 
 void Immigrant::GetCertificate() {
-    std::mutex m_confirmed;
-    std::unique_lock<std::mutex> lk(m_confirmed);
+    // std::mutex m_confirmed;
+    // std::unique_lock<std::mutex> lk(m_confirmed);
     // hold until  judge is done confirming.
     // proceed (end the barrier) when the judge is done confirming
     if (m_judge)
         m_judge->WaitForConfirmed();
     // Judge::cv_confirmed.wait(lk, [] {return Judge::IsDoneConfirming();});
-    std::cout << "getCertificate: "  <<  std::endl;
+
+    std::lock_guard<std::mutex> lk(m);
+    std::cout << "getCertificate: "  << m_index <<  std::endl;
 };
 
 void Immigrant::Checkin() {
 	m_checkedInCount++;
-    std::mutex m;
-    std::lock_guard<std::mutex> lk(m);
-    std::cout << "Check in: " << m_checkedInCount <<  std::endl;
-    if (m_judge && IsAllCheckedIn())
+    {
+        std::lock_guard<std::mutex> lk(m);
+        std::cout << "Check in: " << m_index << ".  checked in count: "<< m_checkedInCount <<  std::endl;
+    }
+    // if (m_judge && IsAllCheckedIn())
+    if (m_judge)
         m_judge->SignalImmigrantsPresent();
 };
 
@@ -64,11 +75,10 @@ void Immigrant::Leave() {
     // Judge::cv_judgePresent.wait(lk, [this] {return !m_judge->IsPresent();});
     if (m_judge)
         m_judge->WaitForNotEntered();
-    std::mutex m;
     std::lock_guard<std::mutex> lk(m);
     m_count--;
     m_checkedInCount--;
-    std::cout << "Immigrant Leave: "  << m_count << std::endl;
+    std::cout << "Immigrant Leave: "  << m_index << std::endl;
 }
 
 
